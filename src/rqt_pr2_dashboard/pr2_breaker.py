@@ -29,27 +29,25 @@
 # LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-import rospy
-
 from python_qt_binding.QtCore import QSize
 
 from pr2_msgs.msg import PowerBoardState
-from pr2_power_board.srv import PowerBoardCommand, PowerBoardCommandRequest
+from pr2_power_board.srv import PowerBoardCommand
 
+from python_qt_binding.QtWidgets import QMessageBox
 from rqt_robot_dashboard.widgets import MenuDashWidget
 
-try:
-    from python_qt_binding.QtGui import QMessageBox
-except:
-    from python_qt_binding.QtWidgets import QMessageBox
+from .ros_util import call_service
 
 
 class PR2BreakerButton(MenuDashWidget):
     """
     Dashboard widget to display and interact with the PR2 Breaker state.
     """
-    def __init__(self, breaker_name, breaker_index):
+    def __init__(self, context, breaker_name, breaker_index):
         """
+        :param context: the plugin context
+        :type context: qt_gui.plugin.Plugin
         :param breaker_name: Name of the breaker
         :type breaker_name: str
         :param breaker_index: Index of the breaker
@@ -72,7 +70,7 @@ class PR2BreakerButton(MenuDashWidget):
 
         icons = [ok_icon, warn_icon, err_icon, stale_icon]
 
-        super(PR2BreakerButton, self).__init__('Breaker:' + breaker_name, icons=icons, icon_paths=[['rqt_pr2_dashboard', 'images']])
+        super(PR2BreakerButton, self).__init__(context, 'Breaker:' + breaker_name, icons=icons, icon_paths=[['rqt_pr2_dashboard', 'images']])
         self.update_state(3)
 
         self.setFixedSize(self._icons[0].actualSize(QSize(50, 30)))
@@ -85,7 +83,8 @@ class PR2BreakerButton(MenuDashWidget):
         self.add_action('Standby All Breakers', self.on_standby_all)
         self.add_action('Disable All Breakers', self.on_disable_all)
 
-        self._power_control = rospy.ServiceProxy('power_board/control', PowerBoardCommand)
+        self._node = context.node
+        self._power_control = self._node.create_client(PowerBoardCommand, 'power_board/control')
         self._serial = 0
         self._index = breaker_index
         self._name = breaker_name
@@ -112,15 +111,15 @@ class PR2BreakerButton(MenuDashWidget):
                 return False
 
         try:
-            power_cmd = PowerBoardCommandRequest()
+            power_cmd = PowerBoardCommand.Request()
             power_cmd.breaker_number = breaker
             power_cmd.command = cmd
             power_cmd.serial_number = self._serial
-            self._power_control(power_cmd)
+            call_service(self._power_control, power_cmd)
 
             return True
-        except rospy.ServiceException as e:
-            QMessageBox.critical(self, "Error", "Service call failed with error: %s" % (e), "Error")
+        except RuntimeError as e:
+            QMessageBox.critical(self, "Error", "Service call failed with error: %s" % (e))
             return False
 
         return False
@@ -211,6 +210,9 @@ class PR2BreakerButton(MenuDashWidget):
         if (status_msg != self._last_status_msg or abs(last_voltage - msg.circuit_voltage[self._index]) >= 0.1):
             self.setToolTip("Breaker: %s \nVoltage: %.02f \nState: %s" % (self._name, msg.circuit_voltage[self._index], status_msg))
             self._last_status_msg = status_msg
+
+    def shutdown(self):
+        self._node.destroy_client(self._power_control)
 
     def reset(self):
         self.set_stale()

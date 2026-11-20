@@ -31,27 +31,21 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import argparse
-import roslib
-roslib.load_manifest('rqt_pr2_dashboard')
-import rospy
 
-from pr2_msgs.msg import PowerBoardState, DashboardState
-import std_srvs.srv
-
+from pr2_msgs.msg import DashboardState, PowerBoardState
+from python_qt_binding.QtCore import QSize, Signal
+from python_qt_binding.QtWidgets import QMessageBox
+from rcl_interfaces.msg import Log
+from rqt_robot_dashboard.console_dash_widget import ConsoleDashWidget
 from rqt_robot_dashboard.dashboard import Dashboard
 from rqt_robot_dashboard.monitor_dash_widget import MonitorDashWidget
-from rqt_robot_dashboard.console_dash_widget import ConsoleDashWidget
+from std_srvs.srv import Empty
 
-from python_qt_binding.QtCore import QSize
-try:
-    from python_qt_binding.QtGui import QMessageBox
-except:
-    from python_qt_binding.QtWidgets import QMessageBox
-
-from .pr2_breaker import PR2BreakerButton
 from .pr2_battery import PR2Battery
+from .pr2_breaker import PR2BreakerButton
 from .pr2_motors import PR2Motors
 from .pr2_runstop import PR2Runstops
+from .ros_util import call_service
 
 
 class PR2Dashboard(Dashboard):
@@ -61,6 +55,9 @@ class PR2Dashboard(Dashboard):
     :param context: the plugin context
     :type context: qt_gui.plugin.Plugin
     """
+    # dashboard_agg messages arrive in rqt's spinner thread; widgets are updated in the GUI thread.
+    _dashboard_message_received = Signal(object)
+
     def setup(self, context):
         self.name = 'PR2 Dashboard'
         self.max_icon_size = QSize(50, 30)
@@ -71,40 +68,52 @@ class PR2Dashboard(Dashboard):
         args = parser.parse_args(context.argv())
         self._motor_namespace = args.motor_namespace
 
+        self._node = context.node
         self._dashboard_message = None
-        self._last_dashboard_message_time = 0.0
+        self._last_dashboard_message_time = None
 
         self._raw_byte = None
         self.digital_outs = [0, 0, 0]
 
         self._console = ConsoleDashWidget(self.context, minimal=False)
+        # rqt_robot_dashboard listens on /rosout_agg, which ROS 2 does not have: listen on /rosout.
+        self._node.destroy_subscription(self._console._subscriber)
+        self._console._subscriber = self._node.create_subscription(
+            Log, '/rosout', self._console._message_cb, 100)
         self._console._show_console()
 
         self._monitor = MonitorDashWidget(self.context)
         self._monitor._show_monitor()
 
-        self._motors = PR2Motors(self.on_reset_motors, self.on_halt_motors)
-        self._breakers = [PR2BreakerButton('Left Arm', 0),
-                         PR2BreakerButton('Base', 1),
-                         PR2BreakerButton('Right Arm', 2)]
+        self._motors = PR2Motors(self.context, self.on_reset_motors, self.on_halt_motors)
+        self._breakers = [PR2BreakerButton(self.context, 'Left Arm', 0),
+                          PR2BreakerButton(self.context, 'Base', 1),
+                          PR2BreakerButton(self.context, 'Right Arm', 2)]
 
-        self._runstop = PR2Runstops('RunStops')
+        self._runstop = PR2Runstops(self.context)
         self._batteries = [PR2Battery(self.context)]
 
-        self._dashboard_agg_sub = rospy.Subscriber('dashboard_agg', DashboardState, self.dashboard_callback)
+        self._reset_motors = self._node.create_client(
+            Empty, '{}/reset_motors'.format(self._motor_namespace))
+        self._halt_motors = self._node.create_client(
+            Empty, '{}/halt_motors'.format(self._motor_namespace))
+
+        self._dashboard_message_received.connect(self.dashboard_callback)
+        self._dashboard_agg_sub = self._node.create_subscription(
+            DashboardState, 'dashboard_agg', lambda msg: self._dashboard_message_received.emit(msg), 10)
 
     def get_widgets(self):
         return [[self._monitor, self._console, self._motors], self._breakers, [self._runstop], self._batteries]
 
     def dashboard_callback(self, msg):
         """
-        callback to process dashboard_agg messages
+        callback to process dashboard_agg messages (runs in the GUI thread)
 
         :param msg: dashboard_agg DashboardState message
         :type msg: pr2_msgs.msg.DashboardState
         """
         self._dashboard_message = msg
-        self._last_dashboard_message_time = rospy.get_time()
+        self._last_dashboard_message_time = self._node.get_clock().now()
 
         if (msg.motors_halted_valid):
             if (not msg.motors_halted.data):
@@ -141,25 +150,27 @@ class PR2Dashboard(Dashboard):
     def on_reset_motors(self):
         # if any of the breakers is not enabled ask if they'd like to enable them
         if (self._dashboard_message is not None and self._dashboard_message.power_board_state_valid):
-            all_breakers_enabled = reduce(lambda x, y: x and y, [state == PowerBoardState.STATE_ON for state in self._dashboard_message.power_board_state.circuit_state])
+            all_breakers_enabled = all(state == PowerBoardState.STATE_ON for state in self._dashboard_message.power_board_state.circuit_state)
             if (not all_breakers_enabled):
                 if(QMessageBox.question(self._breakers[0], self.tr('Enable Breakers?'), self.tr("Resetting the motors may not work because not all breakers are enabled.  Enable all the breakers first?"), QMessageBox.Yes | QMessageBox.No, QMessageBox.Yes) == QMessageBox.Yes):
                     [breaker.set_enable() for breaker in self._breakers]
-        reset = rospy.ServiceProxy("{}/reset_motors".format(self._motor_namespace), std_srvs.srv.Empty)
         try:
-            reset()
-        except rospy.ServiceException as e:
+            call_service(self._reset_motors, Empty.Request())
+        except RuntimeError as e:
             QMessageBox.critical(self._breakers[0], "Error", "Failed to reset the motors: service call failed with error: %s" % (e))
 
     def on_halt_motors(self):
-        halt = rospy.ServiceProxy("{}/halt_motors".format(self._motor_namespace), std_srvs.srv.Empty)
         try:
-            halt()
-        except rospy.ServiceException as e:
+            call_service(self._halt_motors, Empty.Request())
+        except RuntimeError as e:
             QMessageBox.critical(self._motors, "Error", "Failed to halt the motors: service call failed with error: %s" % (e))
 
     def shutdown_dashboard(self):
-        self._dashboard_agg_sub.unregister()
+        self._node.destroy_subscription(self._dashboard_agg_sub)
+        self._node.destroy_client(self._reset_motors)
+        self._node.destroy_client(self._halt_motors)
+        for breaker in self._breakers:
+            breaker.shutdown()
 
     @staticmethod
     def add_arguments(parser):

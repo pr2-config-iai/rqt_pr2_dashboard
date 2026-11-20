@@ -2,6 +2,20 @@
 Changelog for package rqt_pr2_dashboard
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.0.0 (unreleased)
+------------------
+* Port to ROS 2 (Jazzy), ament_python. Same widgets, topics and services as in ROS 1
+  (``dashboard_agg``, ``power_board/control``, ``<motor-namespace>/reset_motors`` and
+  ``halt_motors``).
+* Uses the rqt plugin node (``context.node``); widgets take the plugin context as their first
+  argument, as Jazzy's ``rqt_robot_dashboard`` requires.
+* ``dashboard_agg`` messages are handed to the GUI thread through a Qt signal before widgets are
+  updated (ROS 1 updated them from the subscriber thread).
+* Service calls wait at most 2 s and report unavailable services in a message box.
+* The console listens on ``/rosout``: Jazzy's ``rqt_robot_dashboard`` subscribes to ``/rosout_agg``,
+  which ROS 2 does not have.
+* Fix: the battery tooltip was only updated while charging.
+
 0.4.2 (2025-04-07)
 ------------------
 * catkin_install_python to let catkin to fix shebang (`#28 <https://github.com/PR2/rqt_pr2_dashboard/issues/28>`_)

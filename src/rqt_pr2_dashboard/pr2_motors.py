@@ -38,7 +38,7 @@ class PR2Motors(MenuDashWidget):
     """
     Dashboard widget to display motor state and allow interaction.
     """
-    def __init__(self, reset_callback, halt_callback):
+    def __init__(self, context, reset_callback, halt_callback):
         """
         :param context: the plugin context
         :type context: qt_gui.plugin.Plugin
@@ -53,7 +53,7 @@ class PR2Motors(MenuDashWidget):
         stale_icon = ['bg-grey.svg', 'ic-motors.svg', 'ol-stale-badge.svg']
 
         icons = [ok_icon, warn_icon, err_icon, stale_icon]
-        super(PR2Motors, self).__init__('Motors', icons)
+        super(PR2Motors, self).__init__(context, 'Motors', icons)
         self.update_state(3)
 
         self.add_action('Reset', reset_callback)

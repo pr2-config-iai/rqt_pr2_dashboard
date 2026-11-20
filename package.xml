@@ -1,27 +1,24 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>rqt_pr2_dashboard</name>
-  <version>0.4.2</version>
+  <version>2.0.0</version>
   <description>rqt_pr2_dashboard is a GUI for debugging and controlling low-level state of the PR2.  It shows things like battery status and breaker states, as well as integrating tools like rqt_console and robot_monitor.
   </description>
 
   <author email="ablasdel@gmail.com">Aaron Blasdel</author>
   <maintainer email="Sammy.Pfeiffer@student.uts.edu.au">Sammy Pfeiffer</maintainer>
   <license>BSD</license>
-  
+
   <url type="website">http://ros.org/wiki/rqt_pr2_dashboard</url>
-  <url type="repository">https://github.com/ros-visualization/rqt_pr2_dashboard</url>
-  <url type="bugtracker">https://github.com/ros-visualization/rqt_pr2_dashboard/issues</url>
+  <url type="repository">https://github.com/pr2-config-iai/rqt_pr2_dashboard</url>
 
-  <buildtool_depend>catkin</buildtool_depend>
-  <buildtool_depend condition="$ROS_PYTHON_VERSION == 2">python-setuptools</buildtool_depend>
-  <buildtool_depend condition="$ROS_PYTHON_VERSION == 3">python3-setuptools</buildtool_depend>
-
+  <exec_depend>ament_index_python</exec_depend>
   <exec_depend>diagnostic_msgs</exec_depend>
   <exec_depend>pr2_msgs</exec_depend>
   <exec_depend>pr2_power_board</exec_depend>
-  <exec_depend>roslib</exec_depend>
-  <exec_depend>rospy</exec_depend>
+  <exec_depend>python_qt_binding</exec_depend>
+  <exec_depend>rcl_interfaces</exec_depend>
+  <exec_depend>rclpy</exec_depend>
   <exec_depend>rqt_gui</exec_depend>
   <exec_depend>rqt_gui_py</exec_depend>
   <exec_depend>rqt_robot_dashboard</exec_depend>
@@ -29,8 +26,8 @@
   <exec_depend>std_srvs</exec_depend>
 
   <export>
+    <architecture_independent/>
+    <build_type>ament_python</build_type>
     <rqt_gui plugin="${prefix}/plugin.xml"/>
   </export>
 </package>
-
-

@@ -30,8 +30,6 @@
 # ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import rospy
-
 from python_qt_binding.QtCore import QSize
 from rqt_robot_dashboard.widgets import BatteryDashWidget
 
@@ -61,11 +59,11 @@ class PR2Battery(BatteryDashWidget):
         charge_icons.append(['ic-battery-charge-60-green.svg'])
         charge_icons.append(['ic-battery-charge-80-green.svg'])
         charge_icons.append(['ic-battery-charge-100-green.svg'])
-        super(PR2Battery, self).__init__('PR2 Battery', icons=icons, charge_icons=charge_icons)
+        super(PR2Battery, self).__init__(context, 'PR2 Battery', icons=icons, charge_icons=charge_icons)
 
         self._power_consumption = 0.0
         self._pct = 0
-        self._time_remaining = rospy.rostime.Duration(0)
+        self._time_remaining = 0.0  # seconds
         self._ac_present = 0
         # use inherited function instead of accessing variable
         self.set_charging(False)
@@ -91,7 +89,7 @@ class PR2Battery(BatteryDashWidget):
         last_time_remaining = self._time_remaining
 
         self._power_consumption = msg.power_consumption
-        self._time_remaining = msg.time_remaining
+        self._time_remaining = msg.time_remaining.sec + msg.time_remaining.nanosec * 1e-9
         self._pct = msg.relative_capacity / 100.0
         # use inherited function instead of accessing variable
         self.set_charging(msg.AC_present)
@@ -99,12 +97,12 @@ class PR2Battery(BatteryDashWidget):
             drain_str = "remaining"
             if (self._charging):
                 drain_str = "to full charge"
-                # use battery name varibale
-                self.setToolTip("%s: %.2f%% \nTime %s: %d Minutes" % (self._name, self._pct * 100.0, drain_str, self._time_remaining.to_sec() / 60.0))
+            # use battery name varibale
+            self.setToolTip("%s: %.2f%% \nTime %s: %d Minutes" % (self._name, self._pct * 100.0, drain_str, self._time_remaining / 60.0))
             self.update_perc(msg.relative_capacity)
 
     def set_stale(self):
         # use super function of set_stale instead of copy/paste
         super(PR2Battery, self).set_stale()
-        self._time_remaining = rospy.rostime.Duration(0)
+        self._time_remaining = 0.0  # seconds
         self._power_consumption = 0

@@ -49,7 +49,7 @@ class PR2Runstops(IconToolButton):
         stale_icon = ['bg-grey.svg',  'ic-runstop-off.svg', 'ol-stale-badge.svg']
 
         icons = [ok_icon, physical_engaged_icon, wireless_engaged_icon, stale_icon]
-        super(PR2Runstops, self).__init__('Runstop', icons, icons)
+        super(PR2Runstops, self).__init__(context, 'Runstop', icons, icons)
         self.setToolTip('Runstop')
         self.set_stale()
         self.setFixedSize(self._icons[0].actualSize(QSize(50, 30)))
