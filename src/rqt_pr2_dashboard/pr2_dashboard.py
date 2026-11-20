@@ -45,6 +45,7 @@ from .pr2_battery import PR2Battery
 from .pr2_breaker import PR2BreakerButton
 from .pr2_motors import PR2Motors
 from .pr2_runstop import PR2Runstops
+from . import robot_monitor_fix
 from .ros_util import call_service
 
 
@@ -82,6 +83,9 @@ class PR2Dashboard(Dashboard):
             Log, '/rosout', self._console._message_cb, 100)
         self._console._show_console()
 
+        # Must be patched before the monitor is created, see robot_monitor_fix.
+        if robot_monitor_fix.apply():
+            self._node.get_logger().debug('rqt_robot_monitor: stale check no longer spins the node')
         self._monitor = MonitorDashWidget(self.context)
         self._monitor._show_monitor()
 

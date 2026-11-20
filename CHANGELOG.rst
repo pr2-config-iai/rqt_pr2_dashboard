@@ -12,6 +12,11 @@ Changelog for package rqt_pr2_dashboard
 * ``dashboard_agg`` messages are handed to the GUI thread through a Qt signal before widgets are
   updated (ROS 1 updated them from the subscriber thread).
 * Service calls wait at most 2 s and report unavailable services in a message box.
+* Work around Jazzy's ``rqt_robot_monitor`` calling ``rclpy.spin_once`` on the rqt node from a
+  1 Hz GUI timer. That takes the node away from rqt's spinner, so only one callback per second
+  ran: breaker commands timed out ("did not answer within 2.0 s") and the display lagged.
+  The monitor's stale check is replaced by the same code without the spin
+  (``robot_monitor_fix.py``); it is left alone if the installed monitor does not spin.
 * The console listens on ``/rosout``: Jazzy's ``rqt_robot_dashboard`` subscribes to ``/rosout_agg``,
   which ROS 2 does not have.
 * Fix: the battery tooltip was only updated while charging.
