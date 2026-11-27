@@ -92,7 +92,7 @@ class PR2Battery(BatteryDashWidget):
         self._time_remaining = msg.time_remaining.sec + msg.time_remaining.nanosec * 1e-9
         self._pct = msg.relative_capacity / 100.0
         # use inherited function instead of accessing variable
-        self.set_charging(msg.AC_present)
+        self.set_charging(msg.ac_present)
         if (last_pct != self._pct or last_charging != self._charging or last_time_remaining != self._time_remaining):
             drain_str = "remaining"
             if (self._charging):
